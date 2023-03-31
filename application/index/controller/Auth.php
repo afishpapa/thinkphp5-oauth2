@@ -28,13 +28,16 @@ class Auth extends Controller
     {
         parent::__construct($request);
 
-        // 以下五个Repository需要自己实现
-        $clientRepository = new ClientRepository(); // instance of ClientRepositoryInterface
-        $scopeRepository = new ScopeRepository(); // instance of ScopeRepositoryInterface
-        $accessTokenRepository = new AccessTokenRepository(); // instance of AccessTokenRepositoryInterface
-        $authCodeRepository = new AuthCodeRepository(); // instance of AuthCodeRepositoryInterface
-        $refreshTokenRepository = new RefreshTokenRepository(); // instance of RefreshTokenRepositoryInterface
-        //私钥
+        // 以下2个Repository可以自定义实现
+        $clientRepository = new ClientRepository();
+        $scopeRepository = new ScopeRepository();
+
+        // 以下3个如果不是要自定义auth code / access token 可以不用处理
+        $accessTokenRepository = new AccessTokenRepository();
+        $authCodeRepository = new AuthCodeRepository();
+        $refreshTokenRepository = new RefreshTokenRepository();
+
+        // 私钥
         $privateKey = ROOT_PATH . '/private.key';
         $encryptionKey = 'lxZFUEsBCJ2Yb14IF2ygAHI5N4+ZAUXXaSeeJm6+twsUmIen'; // base64_encode(random_bytes(32))
 
@@ -50,27 +53,27 @@ class Auth extends Controller
         // 启用 client credentials grant
         $authorizationServer->enableGrantType(
             new \League\OAuth2\Server\Grant\ClientCredentialsGrant(),
-            new \DateInterval('PT2H') // access tokens will expire after 1 hour
+            new \DateInterval('PT2H')   // access token 有效期2个小时
         );
 
         // 启用 authentication code grant
         $grant = new \League\OAuth2\Server\Grant\AuthCodeGrant(
             $authCodeRepository,
             $refreshTokenRepository,
-            new \DateInterval('PT10M') // authorization codes will expire after 10 minutes
+            new \DateInterval('PT10M') // authorization codes 有效期10分钟
         );
-        $grant->setRefreshTokenTTL(new \DateInterval('P1M'));
+        $grant->setRefreshTokenTTL(new \DateInterval('P1M')); // refresh tokens 有效期1个月
         $authorizationServer->enableGrantType(
             $grant,
-            new \DateInterval('PT2H') // access tokens will expire after 1 hour
+            new \DateInterval('PT2H')  // access token 有效期2个小时
         );
 
         // 启用 Refresh token grant
         $grant = new \League\OAuth2\Server\Grant\RefreshTokenGrant($refreshTokenRepository);
-        $grant->setRefreshTokenTTL(new \DateInterval('P1M')); // new refresh tokens will expire after 1 month
+        $grant->setRefreshTokenTTL(new \DateInterval('P1M')); // refresh tokens 有效期1个月
         $authorizationServer->enableGrantType(
             $grant,
-            new \DateInterval('PT1H') // new access tokens will expire after an hour
+            new \DateInterval('PT2H') // // access token 有效期2个小时
         );
         $this->authorizationServer = $authorizationServer;
     }
@@ -123,9 +126,10 @@ class Auth extends Controller
         try {
             $psrResponse = $this->authorizationServer->completeAuthorizationRequest($authRequest, $response);
         } catch (OAuthServerException $e) {
-            //用户拒绝授权
+            //用户拒绝授权,报错
             return convertResponsePsr2Tp($e->generateHttpResponse($response));
         }
+        //用户统一授权 跳转第三方redirect_uri
         return convertResponsePsr2Tp($psrResponse);
     }
 
